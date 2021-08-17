@@ -105,7 +105,7 @@ class LoginController extends Controller
             // doesn't validate it at all.
             '',
             $redirectUrl,
-            'Europe/Kiev', // Timezone
+            '', // Timezone
             '', // Timezone offset
         );
 
