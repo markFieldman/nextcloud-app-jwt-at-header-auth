@@ -11,69 +11,56 @@ namespace OCA\JwtAuth\Helper;
  */
 class LoginPageInterceptor {
 
-	/**
-	 * @var UrlGenerator
-	 */
-	private $urlGenerator;
 
-	/**
-	 * @var \OC\User\Session
-	 */
-	private $session;
+    /**
+     * @var \OC\User\Session
+     */
+    private $session;
 
-	public function __construct(
-		UrlGenerator $urlGenerator,
-		\OC\User\Session $session
-	) {
-		$this->urlGenerator = $urlGenerator;
-		$this->session = $session;
-	}
+    public function __construct(
+        \OC\User\Session $session
+    ) {
+        $this->session = $session;
+    }
 
-	public function intercept(): void {
-		if (php_sapi_name() === 'cli') {
-			// Ignore command-line requests (console commands, etc.).
-			return;
-		}
+    public function intercept(): void {
+        if (php_sapi_name() === 'cli') {
+            // Ignore command-line requests (console commands, etc.).
+            return;
+        }
+        $requestUri = $_SERVER['REQUEST_URI'];
+        if (strpos($requestUri, '/login') !== 0) {
+            // Not a login page. We don't care.
+            return;
+        }
 
-		$requestUri = $_SERVER['REQUEST_URI'];
+        // We may sometimes need to see the regular login page.
+        // We can access it with a `forceStay` query parameter to skip this interceptor.
+        if (isset($_GET['forceStay'])) {
+            return;
+        }
 
-		if (strpos($requestUri, '/login') !== 0) {
-			// Not a login page. We don't care.
-			return;
-		}
+        if (isset($_GET['clear'])) {
+            // After a `/logout`, users end up at `/login?clear=1`.
+            //
+            // What Nextcloud wants to do is clear stuff from the JS side using a script (on the login page).
+            // To ensure it doesn't skip it, `ReloadExecutionMiddleware` checks some `clearingExecutionContexts`
+            // session marker.
+            //
+            // If we let Nextcloud render the page at `/login?clear=1`, it'd clear things nicely.
+            // But it would also send us to `/login` after that and that would trigger another auto-login sequence.
+            // .. which we don't want.
+            //
+            // So we can't let the clearing page render. We need to clear things by ourselves.
 
-		// We may sometimes need to see the regular login page.
-		// We can access it with a `forceStay` query parameter to skip this interceptor.
-		if (isset($_GET['forceStay'])) {
-			return;
-		}
-
-		if (isset($_GET['clear'])) {
-			// After a `/logout`, users end up at `/login?clear=1`.
-			//
-			// What Nextcloud wants to do is clear stuff from the JS side using a script (on the login page).
-			// To ensure it doesn't skip it, `ReloadExecutionMiddleware` checks some `clearingExecutionContexts`
-			// session marker.
-			//
-			// If we let Nextcloud render the page at `/login?clear=1`, it'd clear things nicely.
-			// But it would also send us to `/login` after that and that would trigger another auto-login sequence.
-			// .. which we don't want.
-			//
-			// So we can't let the clearing page render. We need to clear things by ourselves.
-
-			// Remove the marker to prevent `ReloadExecutionMiddleware` from kicking in later.
-			$this->session->getSession()->remove('clearingExecutionContexts');
-
-			$nonce = bin2hex(openssl_random_pseudo_bytes(64));
-
-			header(sprintf("Content-Security-Policy: script-src 'nonce-%s'", $nonce));
-
-			$logoutConfirmationUrl = $this->urlGenerator->generateLogoutConfirmationUrl();
-
-			// This is the actual clearing logic found in Nextcloud's `login.js`,
-			// followed by a JS-based redirect to the Identity Provider's logged-out-confirmation page.
-			$html = sprintf(
-				'
+            // Remove the marker to prevent `ReloadExecutionMiddleware` from kicking in later.
+            $this->session->getSession()->remove('clearingExecutionContexts');
+            $nonce = bin2hex(openssl_random_pseudo_bytes(64));
+            header(sprintf("Content-Security-Policy: script-src 'nonce-%s'", $nonce));
+            // This is the actual clearing logic found in Nextcloud's `login.js`,
+            // followed by a JS-based redirect to the Identity Provider's logged-out-confirmation page.
+            $html = sprintf(
+                '
 				<!doctype html>
 				<html>
 					<head>
@@ -91,40 +78,38 @@ class LoginPageInterceptor {
 					</head>
 
 					<body>
-						<p>Redirecting you to: %s</p>
+						<p>Redirecting you to: Drive</p>
 					</body>
 				</html>
 				',
-				$nonce,
-				json_encode($logoutConfirmationUrl),
-				$logoutConfirmationUrl,
-			);
+                $nonce,
+            );
 
-			echo $html;
-			exit;
-		}
+            echo $html;
+            exit;
+        }
 
-		// Finally, this is likely a genuine hit to the `/login` page.
-		// We don't want the Nextcloud login page to be used at all,
-		// so we forward such requests to the Identity Provider, triggering the auto-login sequence.
+        // Finally, this is likely a genuine hit to the `/login` page.
+        // We don't want the Nextcloud login page to be used at all,
+        // so we forward such requests to the Identity Provider, triggering the auto-login sequence.
 
-		// This represents the user wants to go after logging in. We pass it around.
-		$targetPath = (isset($_GET['redirect_url']) ? $_GET['redirect_url'] : '/');
+        // This represents the user wants to go after logging in. We pass it around.
+        $targetPath = (isset($_GET['redirect_url']) ? $_GET['redirect_url'] : '/');
 
-		$targetPathSanitized = \filter_var($targetPath, \FILTER_SANITIZE_URL);
-		if ($targetPathSanitized === false) {
-			$targetPath = '/';
-		} else {
-			$targetPath = $targetPathSanitized;
-		}
+        $targetPathSanitized = \filter_var($targetPath, \FILTER_SANITIZE_URL);
+        if ($targetPathSanitized === false) {
+            $targetPath = '/';
+        } else {
+            $targetPath = $targetPathSanitized;
+        }
 
-		$this->redirectToUrlAndDie($this->urlGenerator->generateAutoLoginUrl($targetPath));
-	}
+        $this->redirectToUrlAndDie('/');
+    }
 
-	private function redirectToUrlAndDie(string $url): void {
-		header('Location: ' . $url);
-		echo sprintf('Redirecting you to: %s', $url);
-		exit;
-	}
+    private function redirectToUrlAndDie(string $url): void {
+        header('Location: ' . $url);
+        echo sprintf('Redirecting you to: %s', $url);
+        exit;
+    }
 
 }

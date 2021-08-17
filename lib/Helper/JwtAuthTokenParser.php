@@ -2,37 +2,31 @@
 declare(strict_types=1);
 
 namespace OCA\JwtAuth\Helper;
+use Firebase\JWT\JWT;
 
-class JwtAuthTokenParser {
+class JwtAuthTokenParser
+{
+    public function __construct()
+    {
+    }
 
-	/**
-	 * @var string
-	 */
-	private $secret;
+    public function parseValidatedToken(string $token, string $publicKeyPath, string $jwtAlg): ?string
+    {
+        $payload = get_object_vars(JWT::decode($token, $this->getPublicKey($publicKeyPath), array($jwtAlg)));
+        if (is_null($payload['entryUUID'])) {
+            return null;
+        }
+        return $payload['entryUUID'];
+    }
 
-	public function __construct(string $secret) {
-		$this->secret = $secret;
-	}
+    private function getPublicKey(string $public_key_path)
+    {
+        if (!is_null($public_key_path)) {
+            return file_get_contents($public_key_path);
+        } else {
+            die("Can`t load public key to verify JWT token");
+        }
+    }
 
-	public function parseValidatedToken(string $token): ?string {
-		$parser = \ReallySimpleJWT\Token::parser($token, $this->secret);
-
-		try {
-			$parsed = $parser->validate()
-				->validateExpiration()
-				->validateNotBefore()
-				->parse();
-
-			$payload = $parsed->getPayload();
-
-			if (!array_key_exists('uid', $payload)) {
-				return null;
-			}
-
-			return $payload['uid'];
-		} catch (\ReallySimpleJWT\Exception\ValidateException $e) {
-			return null;
-		}
-	}
 
 }
