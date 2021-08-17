@@ -42,7 +42,8 @@ Main idea is setting JWT token of user from outer system as `Authorization: Bear
 This JWT Auth Nextcloud application is not available on the Nextcloud [App Store](https://apps.nextcloud.com/) yet, so you **need to install it manually**.
 
 To install it, place its files in a `apps/jwtauth` directory.
-Example: `git clone git@github.com:markfieldman/nextcloud-app-jwtauth apps/jwtauth`.
+
+Example: `git clone git@github.com:markfieldman/nextcloud-app-jwt-at-header-auth apps/jwtauth`.
 
 Then install the app's dependencies using [composer](https://getcomposer.org/): 
 ```bash
