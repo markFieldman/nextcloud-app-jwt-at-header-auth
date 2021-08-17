@@ -4,7 +4,7 @@ A [Nextcloud](https://nextcloud.com/) (v17+) application which lets you auto-log
 To make use of this app, you need another system which generates temporary [JWT](https://jwt.io/) tokens, serving as a login identifier.
 The JWT Auth Nextcloud application securely processes these tokens and transparently logs the user into Nextcloud.
 
-**Note**: Nextcloud must be deployed behind your gateway or proxy, which set JWT token in header.
+**Note**: Nextcloud must be deployed behind your gateway or proxy, which set JWT token in header. If you want use explicit login via your SSO - use the [original repo](https://github.com/devture/nextcloud-app-jwtauth) instead of this
 
 Main idea is setting JWT token of user from outer system as `Authorization: Bearer JWT here` header for transparent login.
 
